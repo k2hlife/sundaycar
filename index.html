@@ -366,9 +366,10 @@
   .req-line{ font-size:13px; color:var(--text-2); margin-bottom:3px; font-weight:500; }
   .req-line b{ color:var(--text-1); }
   .req-memo{ font-size:13px; color:var(--text-3); margin-top:6px; font-style:normal; }
-  .req-actions{ margin-top:12px; }
+  .req-actions{ margin-top:12px; display:flex; gap:8px; }
   .req-actions button{
-    width:100%;
+    flex:1;
+    width:auto;
     height:38px;
     border-radius:var(--radius-sm);
     font-size:13px;
@@ -378,6 +379,7 @@
   }
   .req-actions button:active{ background:var(--line); }
   .req-actions button.cancel{ color:var(--red); }
+  .req-actions button.small{ flex:0 0 auto; padding:0 16px; }
   .seat-info{ font-size:12px; font-weight:700; color:var(--text-3); }
   .seat-info.full{ color:var(--red); }
   .switch.disabled{ opacity:0.4; }
@@ -464,10 +466,39 @@
     </div>
   </div>
 
-  <!-- ================= GUEST: FORM ================= -->
-  <div id="view-form" class="hidden">
+  <!-- ================= GUEST: QUICK INFO (1단계) ================= -->
+  <div id="view-info" class="hidden">
     <div class="appbar">
       <button class="back-btn" onclick="showView('landing')">‹</button>
+      <span class="title" id="info-date-title">이동 신청</span>
+    </div>
+    <div class="section">
+      <div class="section-desc" id="info-service-badge" style="margin:-4px 2px 16px; font-weight:700; color:var(--blue);"></div>
+      <div class="form-card">
+        <div class="field">
+          <label>신청자 이름</label>
+          <input type="text" id="quick-name" placeholder="이름을 입력해주세요" style="height:46px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:15px;font-weight:600;background:var(--bg);">
+        </div>
+        <div class="field">
+          <label>연락처</label>
+          <input type="text" id="quick-phone" placeholder="010-0000-0000" style="height:46px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:15px;font-weight:600;background:var(--bg);">
+        </div>
+        <div class="field">
+          <label>출발지 · 어디서 타시나요?</label>
+          <input type="text" id="quick-loc" placeholder="예: 집 앞, ○○아파트 정문" style="height:46px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:15px;font-weight:600;background:var(--bg);">
+        </div>
+        <div class="error-text" id="err-info">이름, 연락처, 출발지를 모두 입력해주세요.</div>
+      </div>
+    </div>
+    <div class="bottom-bar">
+      <button class="cta-btn" onclick="proceedToDetailForm()">확인</button>
+    </div>
+  </div>
+
+  <!-- ================= GUEST: FORM (2단계 세부신청) ================= -->
+  <div id="view-form" class="hidden">
+    <div class="appbar">
+      <button class="back-btn" onclick="showView('info')">‹</button>
       <span class="title" id="form-date-title">이동 신청</span>
     </div>
     <div class="section">
@@ -537,18 +568,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="form-card">
-        <div class="field">
-          <label>신청자 이름</label>
-          <input type="text" id="req-name" placeholder="이름을 입력해주세요" style="height:46px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:15px;font-weight:600;background:var(--bg);">
-        </div>
-        <div class="field">
-          <label>연락처</label>
-          <input type="text" id="req-phone" placeholder="010-0000-0000" style="height:46px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:15px;font-weight:600;background:var(--bg);">
-        </div>
-        <div class="error-text" id="err-info">이름과 연락처를 입력해주세요.</div>
       </div>
 
       <div class="form-card">
@@ -804,7 +823,7 @@ function showToast(msg){
 
 function showView(name){
   currentView = name;
-  ['landing','form','pin','owner','myrequests'].forEach(v=>{
+  ['landing','info','form','pin','owner','myrequests'].forEach(v=>{
     document.getElementById('view-'+v).classList.toggle('hidden', v!==name);
   });
 }
@@ -829,6 +848,10 @@ const SERVICE_TIMES = {
   '1부': { go: '08:00', return: '10:40' },
   '2부': { go: '10:30', return: '13:30' }
 };
+// 예전 데이터(true 등)가 섞여 있어도 1부/2부만 유효한 값으로 인정해요
+function normalizeService(v){
+  return (v==='1부' || v==='2부') ? v : null;
+}
 
 /* ---------------- 손님: 신청 가능한 배차 리스트(랜딩) ---------------- */
 function renderRideList(){
@@ -840,15 +863,15 @@ function renderRideList(){
   let anyAvailable = false;
   sundays.forEach(d=>{
     const key = fmtKey(d);
-    const service = av[key]; // '1부' | '2부' | undefined
+    const service = normalizeService(av[key]);
     const ownerAvailable = !!service;
+    if (!ownerAvailable) return; // 차주가 열지 않은 날은 목록에 안 보여요
     const remGo = computeRemaining(key, 'go');
     const remReturn = computeRemaining(key, 'return');
     const full = remGo<=0 && remReturn<=0;
-    const selectable = ownerAvailable && !full;
-    if (!ownerAvailable) return; // 차주가 열지 않은 날은 목록에 안 보여요
+    const selectable = !full;
     anyAvailable = true;
-    const times = SERVICE_TIMES[service] || SERVICE_TIMES['1부'];
+    const times = SERVICE_TIMES[service];
     let subText, pillText, pillClass;
     if (full){ subText = '자리가 가득 찼어요'; pillText = '마감'; pillClass = 'no'; }
     else { subText = `오전 ${formatHour(times.go)} 출발`; pillText = '신청'; pillClass = 'go'; }
@@ -909,10 +932,16 @@ function saveLastInfo(name, phone){
   try{ localStorage.setItem('sundayride_last_info', JSON.stringify({name, phone})); }
   catch(e){ /* 저장 안 돼도 괜찮아요 */ }
 }
+let selectedService = null;
 function selectGuestDate(key, d, service){
   selectedDateKey = key;
+  selectedService = service;
+  const label = `${fmtDisplay(d)} · ${service} 차량`;
+  document.getElementById('info-date-title').textContent = fmtDisplay(d);
+  document.getElementById('info-service-badge').textContent = label;
   document.getElementById('form-date-title').textContent = fmtDisplay(d);
-  document.getElementById('form-service-badge').textContent = service ? `${service} 차량` : '';
+  document.getElementById('form-service-badge').textContent = label;
+
   goOn = true; returnOn = true; adultCount = 1; kidCount = 0;
   returnLocManuallyEdited = false;
   const times = SERVICE_TIMES[service] || SERVICE_TIMES['1부'];
@@ -920,17 +949,34 @@ function selectGuestDate(key, d, service){
   document.getElementById('go-loc').value = '';
   document.getElementById('return-time').value = times.return;
   document.getElementById('return-loc').value = '';
-  const last = loadLastInfo();
-  document.getElementById('req-name').value = last ? last.name : '';
-  document.getElementById('req-phone').value = last ? last.phone : '';
   document.getElementById('req-memo').value = '';
   document.getElementById('adult-val').textContent = adultCount;
   document.getElementById('kid-val').textContent = kidCount;
   syncTripUI('go'); syncTripUI('return');
+
+  const last = loadLastInfo();
+  document.getElementById('quick-name').value = last ? last.name : '';
+  document.getElementById('quick-phone').value = last ? last.phone : '';
+  document.getElementById('quick-loc').value = '';
+  document.getElementById('err-info').classList.remove('show');
+  showView('info');
+}
+function proceedToDetailForm(){
+  const name = document.getElementById('quick-name').value.trim();
+  const phone = document.getElementById('quick-phone').value.trim();
+  const loc = document.getElementById('quick-loc').value.trim();
+  if (!name || !phone || !loc){
+    document.getElementById('err-info').classList.add('show');
+    return;
+  }
+  document.getElementById('err-info').classList.remove('show');
+  document.getElementById('go-loc').value = loc;
+  if (!returnLocManuallyEdited){
+    document.getElementById('return-loc').value = loc;
+  }
   refreshSeatInfo();
   document.getElementById('err-trip').textContent = '이동 편을 하나 이상 선택해주세요.';
   document.getElementById('err-trip').classList.remove('show');
-  document.getElementById('err-info').classList.remove('show');
   showView('form');
 }
 function toggleTrip(which){
@@ -957,8 +1003,8 @@ function changeCount(type, delta){
   }
 }
 function submitRequest(){
-  const name = document.getElementById('req-name').value.trim();
-  const phone = document.getElementById('req-phone').value.trim();
+  const name = document.getElementById('quick-name').value.trim();
+  const phone = document.getElementById('quick-phone').value.trim();
   let ok = true;
   if (!goOn && !returnOn){
     document.getElementById('err-trip').textContent = '이동 편을 하나 이상 선택해주세요.';
@@ -967,8 +1013,7 @@ function submitRequest(){
   } else {
     document.getElementById('err-trip').classList.remove('show');
   }
-  if (!name || !phone){ document.getElementById('err-info').classList.add('show'); ok = false; }
-  else document.getElementById('err-info').classList.remove('show');
+  if (!name || !phone){ showToast('이름/연락처 입력이 빠졌어요. 이전 화면으로 돌아가주세요'); ok = false; }
   if (!ok) return;
 
   const partySize = adultCount + kidCount;
@@ -1042,7 +1087,7 @@ function renderOwnerCalendar(){
   const av = demoMode ? localState.availability : cachedAvailability;
   sundays.forEach(d=>{
     const key = fmtKey(d);
-    const service = av[key]; // '1부' | '2부' | undefined
+    const service = normalizeService(av[key]); // '1부' | '2부' | null
     const card = document.createElement('div');
     card.className = 'date-card';
     card.innerHTML = `
@@ -1096,10 +1141,7 @@ function renderRequestList(reqs){
     if (r.returnNeeded) lines += `<div class="req-line">🌇 오는편 · <b>${r.returnTime}</b> · ${r.returnLoc||'장소 미입력'}</div>`;
     const badgeClass = r.status==='done' ? 'done' : (r.status==='cancelled' ? 'cancel' : 'wait');
     const badgeText = r.status==='done' ? '확인완료' : (r.status==='cancelled' ? '취소됨' : '대기중');
-    const actionHtml = r.status==='cancelled' ? '' : `
-        <div class="req-actions">
-          <button onclick="updateRequestStatus('${r.id}','${r.status==='done'?'wait':'done'}')">${r.status==='done' ? '대기중으로 되돌리기' : '확인완료로 표시'}</button>
-        </div>`;
+    const statusBtn = r.status==='cancelled' ? '' : `<button onclick="updateRequestStatus('${r.id}','${r.status==='done'?'wait':'done'}')">${r.status==='done' ? '대기중으로 되돌리기' : '확인완료로 표시'}</button>`;
     return `
       <div class="req-card">
         <div class="req-top">
@@ -1110,10 +1152,22 @@ function renderRequestList(reqs){
         <div class="req-phone">${r.phone}</div>
         ${lines}
         ${r.memo ? `<div class="req-memo">💬 ${r.memo}</div>` : ''}
-        ${actionHtml}
+        <div class="req-actions">
+          ${statusBtn}
+          <button class="cancel small" onclick="deleteRequest('${r.id}')">삭제</button>
+        </div>
       </div>
     `;
   }).join('');
+}
+function deleteRequest(id){
+  if (!confirm('이 신청을 완전히 삭제할까요?\n되돌릴 수 없어요.')) return;
+  if (demoMode){
+    localState.requests = localState.requests.filter(r=>r.id!==id);
+    handleRequestsUpdate(localState.requests);
+    return;
+  }
+  db.ref('requests/'+id).remove();
 }
 
 /* ---------------- 손님: 내 신청내역 ---------------- */
