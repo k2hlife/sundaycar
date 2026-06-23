@@ -79,12 +79,8 @@
   /* ---------- Landing ---------- */
   .landing{
     padding:0 24px;
-    display:flex;
-    flex-direction:column;
-    min-height:100vh;
   }
   .landing-top{ padding-top:32px; padding-bottom:8px;}
-  .landing-bottom{ margin-top:auto; padding-top:20px; padding-bottom:36px; }
   .hero-icon{ width:84px; height:84px; margin-bottom:28px;}
   .landing h1{
     font-size:28px;
@@ -100,7 +96,6 @@
     margin:0;
     font-weight:500;
   }
-  .landing-bottom{ padding-bottom:36px; }
   .cta-btn{
     width:100%;
     height:56px;
@@ -173,6 +168,20 @@
   }
   .pill.go{ background:var(--blue-light); color:var(--blue); }
   .pill.no{ background:var(--bg); color:var(--text-4); }
+  .pill.svc{ background:var(--text-1); color:#fff; margin-right:6px; }
+
+  /* 1부/2부 선택 버튼 (차주모드) */
+  .svc-toggle{ display:flex; gap:8px; flex-shrink:0; }
+  .svc-btn{
+    width:46px; height:36px;
+    border-radius:10px;
+    background:var(--bg);
+    color:var(--text-3);
+    font-size:13px;
+    font-weight:700;
+  }
+  .svc-btn.active{ background:var(--blue); color:#fff; }
+  .svc-btn:active{ transform:scale(0.96); }
 
   /* toggle switch (owner availability) */
   .switch{
@@ -444,42 +453,25 @@
       <h1>주일, 혼자<br>가지 않아도 돼요</h1>
       <p class="sub">가장이 아프거나 일이 있는 주일에도<br>사모님과 아이들이 편하게<br>예배를 오고 갈 수 있도록 도와드려요.</p>
     </div>
-    <div id="landing-status-section" class="section hidden" style="padding:0 0 0;">
-      <div class="section-title" style="font-size:15px; margin:24px 0 10px;">확정된 이동</div>
-      <div id="landing-status-list"></div>
+    <div class="section" style="padding-top:0;">
+      <div class="section-title" style="font-size:16px; margin:24px 2px 10px;">신청 가능한 배차</div>
+      <div class="date-list" id="ride-list"></div>
     </div>
-    <div class="landing-bottom">
-      <button class="cta-btn" onclick="goGuestStart()">이동 신청하기</button>
-      <div class="links-row">
-        <button class="owner-link" onclick="goMyRequests()">내 신청내역</button>
-        <span class="dot">·</span>
-        <button class="owner-link" onclick="goOwnerPin()">차주이신가요?</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================= GUEST: CALENDAR ================= -->
-  <div id="view-calendar" class="hidden">
-    <div class="appbar">
-      <button class="back-btn" onclick="showView('landing')">‹</button>
-      <span class="title">날짜 선택</span>
-    </div>
-    <div class="section">
-      <div class="section-title">어느 주일에<br>이동이 필요하세요?</div>
-      <div class="section-desc">차량 섬김이 가능한 날만 선택할 수 있어요.</div>
-    </div>
-    <div class="section">
-      <div class="date-list" id="guest-date-list"></div>
+    <div class="links-row" style="margin:28px 0 36px;">
+      <button class="owner-link" onclick="goMyRequests()">내 신청내역</button>
+      <span class="dot">·</span>
+      <button class="owner-link" onclick="goOwnerPin()">차주이신가요?</button>
     </div>
   </div>
 
   <!-- ================= GUEST: FORM ================= -->
   <div id="view-form" class="hidden">
     <div class="appbar">
-      <button class="back-btn" onclick="showView('calendar')">‹</button>
+      <button class="back-btn" onclick="showView('landing')">‹</button>
       <span class="title" id="form-date-title">이동 신청</span>
     </div>
     <div class="section">
+      <div class="section-desc" id="form-service-badge" style="margin:-4px 2px 16px; font-weight:700; color:var(--blue);"></div>
 
       <div class="trip-block">
         <div class="trip-head">
@@ -579,6 +571,15 @@
       <span class="title">내 신청내역</span>
     </div>
     <div class="section">
+      <div class="form-card" style="margin-top:14px;">
+        <div class="field">
+          <label>다른 기기에서 신청했나요? 전화번호로 찾아보세요</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="lookup-phone" placeholder="010-0000-0000" style="flex:1; height:46px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:15px;font-weight:600;background:var(--bg);">
+            <button onclick="searchByPhone()" style="height:46px; padding:0 18px; background:var(--blue); color:#fff; border-radius:10px; font-size:14px; font-weight:700;">조회</button>
+          </div>
+        </div>
+      </div>
       <div id="myreq-list" style="margin-top:14px;"></div>
     </div>
   </div>
@@ -671,23 +672,23 @@ function initFirebase(){
 
 /* ---------------- 데이터 레이어 ---------------- */
 const localState = {
-  availability: {},   // { 'YYYY-MM-DD': true }
+  availability: {},   // { 'YYYY-MM-DD': '1부' | '2부' }
   requests: []         // [{id, date, ...}]
 };
 
 function seedDemoData(){
   const sundays = getUpcomingSundays(12);
-  localState.availability[fmtKey(sundays[0])] = true;
-  localState.availability[fmtKey(sundays[1])] = true;
-  localState.availability[fmtKey(sundays[3])] = true;
+  localState.availability[fmtKey(sundays[0])] = '1부';
+  localState.availability[fmtKey(sundays[1])] = '2부';
+  localState.availability[fmtKey(sundays[3])] = '1부';
   localState.requests.push({
     id: 'demo1',
     date: fmtKey(sundays[0]),
     name: '김OO',
     phone: '010-1234-5678',
     adults: 1, kids: 2,
-    goNeeded: true, goTime: '10:00', goLoc: '아파트 정문',
-    returnNeeded: true, returnTime: '12:30', returnLoc: '아파트 정문',
+    goNeeded: true, goTime: '08:00', goLoc: '아파트 정문',
+    returnNeeded: true, returnTime: '10:40', returnLoc: '아파트 정문',
     memo: '카시트 하나 부탁드려요',
     status: 'wait',
     createdAt: Date.now()
@@ -698,13 +699,14 @@ function onAvailabilityChange(cb){
   if (demoMode){ cb(localState.availability); return; }
   db.ref('availability').on('value', snap => cb(snap.val() || {}));
 }
-function setAvailability(key, value){
+function setAvailability(key, service){
   if (demoMode){
-    if (value) localState.availability[key] = true; else delete localState.availability[key];
+    if (service) localState.availability[key] = service; else delete localState.availability[key];
     renderOwnerCalendar();
+    renderRideList();
     return;
   }
-  if (value) db.ref('availability/'+key).set(true);
+  if (service) db.ref('availability/'+key).set(service);
   else db.ref('availability/'+key).remove();
 }
 function onRequestsChange(cb){
@@ -746,16 +748,15 @@ function computeRemaining(dateKey, leg){
 }
 function handleRequestsUpdate(reqs){
   requestsCache = reqs;
-  renderLandingStatus();
   if (currentView==='owner') renderRequestList(requestsCache);
-  if (currentView==='calendar') renderGuestCalendar();
+  if (currentView==='landing') renderRideList();
   if (currentView==='form' && selectedDateKey) refreshSeatInfo();
   if (currentView==='myrequests') renderMyRequests();
 }
 
 let cachedAvailability = {};
 function attachFirebaseListeners(){
-  onAvailabilityChange(av => { cachedAvailability = av; renderGuestCalendar(); renderOwnerCalendar(); });
+  onAvailabilityChange(av => { cachedAvailability = av; renderRideList(); renderOwnerCalendar(); });
   onRequestsChange(reqs => handleRequestsUpdate(reqs));
 }
 
@@ -803,13 +804,9 @@ function showToast(msg){
 
 function showView(name){
   currentView = name;
-  ['landing','calendar','form','pin','owner','myrequests'].forEach(v=>{
+  ['landing','form','pin','owner','myrequests'].forEach(v=>{
     document.getElementById('view-'+v).classList.toggle('hidden', v!==name);
   });
-}
-function goGuestStart(){
-  renderGuestCalendar();
-  showView('calendar');
 }
 function goOwnerPin(){
   document.getElementById('pin-input').value = '';
@@ -827,45 +824,59 @@ function checkPin(){
   }
 }
 
-/* ---------------- 손님: 날짜 선택 ---------------- */
-function renderGuestCalendar(){
-  const list = document.getElementById('guest-date-list');
+// 부별(1부/2부) 기본 출발시간
+const SERVICE_TIMES = {
+  '1부': { go: '08:00', return: '10:40' },
+  '2부': { go: '10:30', return: '13:30' }
+};
+
+/* ---------------- 손님: 신청 가능한 배차 리스트(랜딩) ---------------- */
+function renderRideList(){
+  const list = document.getElementById('ride-list');
+  if (!list) return;
   list.innerHTML = '';
   const sundays = getUpcomingSundays(12);
   const av = demoMode ? localState.availability : cachedAvailability;
   let anyAvailable = false;
   sundays.forEach(d=>{
     const key = fmtKey(d);
-    const ownerAvailable = !!av[key];
+    const service = av[key]; // '1부' | '2부' | undefined
+    const ownerAvailable = !!service;
     const remGo = computeRemaining(key, 'go');
     const remReturn = computeRemaining(key, 'return');
     const full = remGo<=0 && remReturn<=0;
     const selectable = ownerAvailable && !full;
-    if (selectable) anyAvailable = true;
+    if (!ownerAvailable) return; // 차주가 열지 않은 날은 목록에 안 보여요
+    anyAvailable = true;
+    const times = SERVICE_TIMES[service] || SERVICE_TIMES['1부'];
     let subText, pillText, pillClass;
-    if (!ownerAvailable){ subText = '이 날은 운행이 없어요'; pillText = '불가'; pillClass = 'no'; }
-    else if (full){ subText = '자리가 가득 찼어요'; pillText = '마감'; pillClass = 'no'; }
-    else { subText = '예배 이동 가능'; pillText = '선택'; pillClass = 'go'; }
+    if (full){ subText = '자리가 가득 찼어요'; pillText = '마감'; pillClass = 'no'; }
+    else { subText = `오전 ${formatHour(times.go)} 출발`; pillText = '신청'; pillClass = 'go'; }
     const card = document.createElement('div');
     card.className = 'date-card' + (selectable ? '' : ' unavailable');
     card.innerHTML = `
       <div class="d-info">
         <div class="d-num"><span class="num">${d.getDate()}</span><span>${d.getMonth()+1}월</span></div>
         <div class="d-text">
-          <div class="main">${fmtDisplay(d)}</div>
+          <div class="main"><span class="pill svc">${service}</span>${fmtDisplay(d)}</div>
           <div class="sub">${subText}</div>
         </div>
       </div>
       <div class="pill ${pillClass}">${pillText}</div>
     `;
     if (selectable){
-      card.onclick = () => selectGuestDate(key, d);
+      card.onclick = () => selectGuestDate(key, d, service);
     }
     list.appendChild(card);
   });
   if (!anyAvailable){
-    list.innerHTML = '<div class="empty-state">아직 선택할 수 있는 날이 없어요.<br>차주님께 확인해주세요.</div>';
+    list.innerHTML = '<div class="empty-state">아직 신청 가능한 날이 없어요.<br>차주님께 확인해주세요.</div>';
   }
+}
+function formatHour(timeStr){
+  const [h, m] = timeStr.split(':');
+  const hh = Number(h);
+  return m==='00' ? `${hh}시` : `${hh}시 ${m}분`;
 }
 function updateSeatInfoUI(leg, remaining){
   const el = document.getElementById('seat-'+leg);
@@ -890,17 +901,28 @@ function refreshSeatInfo(){
   updateSeatInfoUI('go', remGo);
   updateSeatInfoUI('return', remReturn);
 }
-function selectGuestDate(key, d){
+function loadLastInfo(){
+  try{ return JSON.parse(localStorage.getItem('sundayride_last_info') || 'null'); }
+  catch(e){ return null; }
+}
+function saveLastInfo(name, phone){
+  try{ localStorage.setItem('sundayride_last_info', JSON.stringify({name, phone})); }
+  catch(e){ /* 저장 안 돼도 괜찮아요 */ }
+}
+function selectGuestDate(key, d, service){
   selectedDateKey = key;
   document.getElementById('form-date-title').textContent = fmtDisplay(d);
+  document.getElementById('form-service-badge').textContent = service ? `${service} 차량` : '';
   goOn = true; returnOn = true; adultCount = 1; kidCount = 0;
   returnLocManuallyEdited = false;
-  document.getElementById('go-time').value = '10:00';
+  const times = SERVICE_TIMES[service] || SERVICE_TIMES['1부'];
+  document.getElementById('go-time').value = times.go;
   document.getElementById('go-loc').value = '';
-  document.getElementById('return-time').value = '13:30';
+  document.getElementById('return-time').value = times.return;
   document.getElementById('return-loc').value = '';
-  document.getElementById('req-name').value = '';
-  document.getElementById('req-phone').value = '';
+  const last = loadLastInfo();
+  document.getElementById('req-name').value = last ? last.name : '';
+  document.getElementById('req-phone').value = last ? last.phone : '';
   document.getElementById('req-memo').value = '';
   document.getElementById('adult-val').textContent = adultCount;
   document.getElementById('kid-val').textContent = kidCount;
@@ -987,6 +1009,7 @@ function submitRequest(){
 
   addRequest(reqObj).then(newId=>{
     if (newId){ myRequestIds.push(newId); saveMyIds(); }
+    saveLastInfo(name, phone);
     sendTelegramNotification(buildNotificationText(reqObj, dateObj));
     showToast('신청이 접수됐어요');
     goMyRequests();
@@ -1019,23 +1042,29 @@ function renderOwnerCalendar(){
   const av = demoMode ? localState.availability : cachedAvailability;
   sundays.forEach(d=>{
     const key = fmtKey(d);
-    const available = !!av[key];
+    const service = av[key]; // '1부' | '2부' | undefined
     const card = document.createElement('div');
     card.className = 'date-card';
     card.innerHTML = `
       <div class="d-info">
-        <div class="d-num" style="${available?'':'background:var(--bg);color:var(--text-4);'}"><span class="num">${d.getDate()}</span><span>${d.getMonth()+1}월</span></div>
+        <div class="d-num" style="${service?'':'background:var(--bg);color:var(--text-4);'}"><span class="num">${d.getDate()}</span><span>${d.getMonth()+1}월</span></div>
         <div class="d-text">
           <div class="main">${fmtDisplay(d)}</div>
-          <div class="sub">${available ? '신청 받는 중' : '신청 닫힘'}</div>
+          <div class="sub">${service ? service+' 신청 받는 중' : '신청 닫힘'}</div>
         </div>
       </div>
-      <div class="switch ${available?'on':''}" data-key="${key}"><div class="knob"></div></div>
+      <div class="svc-toggle">
+        <button class="svc-btn ${service==='1부'?'active':''}" data-svc="1부">1부</button>
+        <button class="svc-btn ${service==='2부'?'active':''}" data-svc="2부">2부</button>
+      </div>
     `;
-    card.querySelector('.switch').onclick = (e)=>{
-      e.stopPropagation();
-      setAvailability(key, !available);
-    };
+    card.querySelectorAll('.svc-btn').forEach(btn=>{
+      btn.onclick = (e)=>{
+        e.stopPropagation();
+        const clicked = btn.getAttribute('data-svc');
+        setAvailability(key, service===clicked ? null : clicked);
+      };
+    });
     list.appendChild(card);
   });
 }
@@ -1133,29 +1162,18 @@ function cancelMyRequest(id){
   updateRequestStatus(id, 'cancelled');
   showToast('신청을 취소했어요');
 }
-
-/* ---------------- 랜딩: 확정된 신청 현황 ---------------- */
-function renderLandingStatus(){
-  const section = document.getElementById('landing-status-section');
-  const list = document.getElementById('landing-status-list');
-  if (!section || !list) return;
-  const todayKey = fmtKey(new Date());
-  const confirmed = requestsCache.filter(r => r.status==='done' && r.date>=todayKey);
-  if (!confirmed.length){ section.classList.add('hidden'); return; }
-  const sundays = getUpcomingSundays(12);
-  const sorted = [...confirmed].sort((a,b)=>a.date.localeCompare(b.date));
-  list.innerHTML = sorted.map(r=>{
-    const d = sundays.find(x=>fmtKey(x)===r.date);
-    const dateLabel = d ? (d.getMonth()+1)+'/'+d.getDate()+'(일)' : r.date;
-    const count = (Number(r.adults)||0) + (Number(r.kids)||0);
-    return `
-      <div class="status-card">
-        <div><div class="s-date">${dateLabel}</div><div class="s-name">${r.name}</div></div>
-        <div class="s-count">${count}명 확정</div>
-      </div>
-    `;
-  }).join('');
-  section.classList.remove('hidden');
+function searchByPhone(){
+  const phone = document.getElementById('lookup-phone').value.trim();
+  if (!phone){ showToast('전화번호를 입력해주세요'); return; }
+  const found = requestsCache.filter(r => r.phone === phone);
+  if (!found.length){ showToast('이 번호로 신청한 내역이 없어요'); return; }
+  let added = 0;
+  found.forEach(r=>{
+    if (!myRequestIds.includes(r.id)){ myRequestIds.push(r.id); added++; }
+  });
+  if (added>0) saveMyIds();
+  showToast(`${found.length}건을 찾았어요`);
+  renderMyRequests();
 }
 
 /* ---------------- 시작 ---------------- */
