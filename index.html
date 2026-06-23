@@ -877,13 +877,16 @@ function renderRideList(){
     anyAvailable = true;
     const times = SERVICE_TIMES[service];
     const dateText = `${d.getMonth()+1}월${d.getDate()}일`;
-    let pillText, pillClass, lineText;
+    const remMin = Math.min(remGo, remReturn);
+    let pillText, pillClass, mainText, subHtml;
     if (full){
       pillText = '마감'; pillClass = 'no';
-      lineText = `${service}예배 · 자리 가득 찼어요`;
+      mainText = `${service}예배 · 자리 가득 찼어요`;
+      subHtml = '';
     } else {
       pillText = '신청'; pillClass = 'go';
-      lineText = `${service}예배 · 오전 ${formatHour(times.go)} 출발`;
+      mainText = `${service}예배 · 오전 ${formatHour(times.go)} 출발`;
+      subHtml = `<div class="sub" style="color:var(--red); font-weight:800;">${remMin}명 가능</div>`;
     }
     const card = document.createElement('div');
     card.className = 'date-card' + (selectable ? '' : ' unavailable');
@@ -891,7 +894,8 @@ function renderRideList(){
       <div class="d-info">
         <div class="d-num rect">${dateText}</div>
         <div class="d-text">
-          <div class="main" style="font-size:14px; white-space:nowrap;">${lineText}</div>
+          <div class="main" style="font-size:14px; white-space:nowrap;">${mainText}</div>
+          ${subHtml}
         </div>
       </div>
       <div class="pill ${pillClass}">${pillText}</div>
@@ -924,6 +928,12 @@ function updateSeatInfoUI(leg, remaining){
     sw.classList.remove('disabled');
   }
 }
+function getMaxPartySize(){
+  let max = MAX_SEATS;
+  if (goOn) max = Math.min(max, computeRemaining(selectedDateKey, 'go'));
+  if (returnOn) max = Math.min(max, computeRemaining(selectedDateKey, 'return'));
+  return max;
+}
 function refreshSeatInfo(){
   if (!selectedDateKey) return;
   const remGo = computeRemaining(selectedDateKey, 'go');
@@ -932,6 +942,17 @@ function refreshSeatInfo(){
   if (remReturn<=0 && returnOn){ returnOn = false; syncTripUI('return'); showToast('오는편 자리가 방금 다 찼어요'); }
   updateSeatInfoUI('go', remGo);
   updateSeatInfoUI('return', remReturn);
+  clampPartySize();
+}
+function clampPartySize(){
+  const max = getMaxPartySize();
+  if (adultCount + kidCount > max){
+    while (adultCount + kidCount > max && kidCount > 0) kidCount--;
+    while (adultCount + kidCount > max && adultCount > 0) adultCount--;
+    document.getElementById('adult-val').textContent = adultCount;
+    document.getElementById('kid-val').textContent = kidCount;
+    showToast(`남은 자리가 ${max}석이라 인원을 줄였어요`);
+  }
 }
 function loadLastInfo(){
   try{ return JSON.parse(localStorage.getItem('sundayride_last_info') || 'null'); }
@@ -996,6 +1017,7 @@ function toggleTrip(which){
   }
   if (which==='go') goOn = !goOn; else returnOn = !returnOn;
   syncTripUI(which);
+  clampPartySize();
 }
 function syncTripUI(which){
   const on = which==='go' ? goOn : returnOn;
@@ -1003,6 +1025,13 @@ function syncTripUI(which){
   document.getElementById('body-'+which).classList.toggle('hidden', !on);
 }
 function changeCount(type, delta){
+  if (delta > 0){
+    const max = getMaxPartySize();
+    if (adultCount + kidCount >= max){
+      showToast(`이 편은 최대 ${max}명까지만 신청할 수 있어요`);
+      return;
+    }
+  }
   if (type==='adult'){
     adultCount = Math.max(0, Math.min(6, adultCount+delta));
     document.getElementById('adult-val').textContent = adultCount;
