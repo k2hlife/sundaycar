@@ -888,7 +888,7 @@ function renderRideList(){
       subHtml = '';
     } else {
       pillText = '신청'; pillClass = 'go';
-      mainText = `${service}예배 · 오전 ${formatHour(times.go)} 출발`;
+      mainText = `${service}예배 · ${times.go} 출발`;
       subHtml = `<div class="sub" style="color:var(--red); font-weight:800;">${remMin}명 가능</div>`;
     }
     const card = document.createElement('div');
@@ -897,7 +897,7 @@ function renderRideList(){
       <div class="d-info">
         <div class="d-num rect">${dateText}</div>
         <div class="d-text">
-          <div class="main" style="font-size:14px; white-space:nowrap;">${mainText}</div>
+          <div class="main" style="font-size:14px; white-space:normal; overflow:visible; text-overflow:initial; line-height:1.3;">${mainText}</div>
           ${subHtml}
         </div>
       </div>
@@ -911,11 +911,6 @@ function renderRideList(){
   if (!anyAvailable){
     list.innerHTML = '<div class="empty-state">아직 신청 가능한 날이 없어요.<br>차주님께 확인해주세요.</div>';
   }
-}
-function formatHour(timeStr){
-  const [h, m] = timeStr.split(':');
-  const hh = Number(h);
-  return m==='00' ? `${hh}시` : `${hh}시 ${m}분`;
 }
 function updateSeatInfoUI(leg, remaining){
   const el = document.getElementById('seat-'+leg);
